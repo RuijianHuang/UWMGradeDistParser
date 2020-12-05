@@ -1,5 +1,7 @@
 import sys
 import re
+import pandas
+import openpyxl
 
 def removeIrrelevantLines(lines):
     removeIndex = []
@@ -14,7 +16,7 @@ def removeIrrelevantLines(lines):
 
 def getCsvByLines(fn):
     try: 
-        f = open(sys.argv[1])
+        f = open(fn)
         lines = [l.strip() for l in f.readlines()]
         f.close()
         removeIrrelevantLines(lines)
@@ -110,7 +112,7 @@ def unifyColumns(pages):
                     continue
                 else:
                     print("Error: cannot find identify course_name by existing "\
-                            "stop_signs in {} page {} line \n{}".format(sys.argv[1], i, l_joined))
+                            "stop_signs in {} page {} line \n{}".format(cur_file, i, l_joined))
                     exit(1)
 
             course_name_tail = l_joined.index(findings[0])
@@ -132,7 +134,7 @@ def unifyColumns(pages):
 
             # DEBUG
             if len(l) != 21 and "***" not in "".join(l):                # FIXME: get rid of *** lines
-                print("Warning: #col mismatch at:\n", sys.argv[1], len(l), "p", i, l)
+                print("Warning: #col mismatch at:\n", cur_file, len(l), "p", i, l)
 
             pages[i][j] = l
         for index in reversed(removeIndex): pages[i].pop(index)
@@ -183,9 +185,10 @@ def addInfoFromHeader(pages):
         dept_abbr = sub[3:].strip()
         dept_name = p[start-2][:p[start-2].index('Section')].strip()
         school = p[start-3].strip()
-        
+        term = cur_file[:cur_file.index('.csv')]
+        term = term[cur_file.rfind('/')+1:]
         for j in range(start, end):
-            pages[i][j].extend([school, dept_code, dept_abbr, dept_name])
+            pages[i][j].extend([school, dept_code, dept_abbr, dept_name, term])
 
 def finalTrim(pages):
     lines = []
@@ -194,25 +197,60 @@ def finalTrim(pages):
         lines.extend(pages[i][start:end])
     return lines
 
-empty_course_name = 'empty'
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python3 ??extractor.py <csv file>")
-        exit(1)
-        
-    lines = getCsvByLines(sys.argv[1])
+def getLetter(n):
+    return chr(ord('@')+n)
+
+def writeExcel(lines, sname):
+    wb.create_sheet(title=sname)
+    st = wb[sname]
+    for r, l in enumerate(lines):
+        for i in range(len(l)):
+            st[getLetter(i+1)+str(r+1)] = l[i]
+
+def processCsv(fn):
+    lines = getCsvByLines(fn)
     pages = paginate(lines)
     unifyColumns(pages)
     fillEmptyCourseName(pages)
     removeMoreIrrelevantLines(pages)
     addInfoFromHeader(pages)
     lines = finalTrim(pages)
-    
+
     # DEBUG print
     #  for p in pages:
     #      start, end = findPageBounds(p)
     #      for j in range(start, end):
     #          print(p[j])
     #  for l in lines:
+    #      print(l)
     #      if len(l) != 25:
-    #          print(sys.argv[1], len(l), l)
+    #          print(cur_file, len(l), l)
+    return lines
+
+
+cur_file = None
+dest_folder = './'
+src_folder = './grade/'
+empty_course_name = 'empty'
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python3 ??extractor.py <csv file>")
+        exit(1)
+    
+    if sys.argv[1] == '-b' or sys.argv[1] == '--batch':
+        wb = openpyxl.Workbook()
+        for year in range(2014, 2020+1):
+            for term in ['spring', 'fall']:
+                if year == 2014 and term == 'spring': continue
+                elif year == 2020 and term == 'fall': continue
+                
+                cur_file = src_folder + str(year) + term + '.csv'
+                print("Processing", cur_file)
+                writeExcel(processCsv(cur_file), str(year)+term)
+                
+        print('Saving')
+        wb.save('./grade/grade_dist.xlsx')
+
+    else: 
+        cur_file = sys.argv[1]
+        processCsv(cur_file)
