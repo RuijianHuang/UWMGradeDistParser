@@ -8,8 +8,9 @@ def findPageBounds(p):
     start = None
     end = None
     for i in range(len(p)):
-        if 'FACILITY_ID' in p[i] and 'COMB_ENRL' in p[i]: start = i+1
-        if 'PAGE NUMBER' in p[i] and 'OF' in p[i]: 
+        if 'EMPLID' in p[i] and 'instructor role' in p[i].lower():
+            start = i+1
+        elif 'PAGE NUMBER' in p[i] and 'OF' in p[i]: 
             end = i
             break
     if start is None:
@@ -17,9 +18,9 @@ def findPageBounds(p):
         for i in p: print(i)
         exit(1)
     if end is None: end = len(p)-1
-    if start >  end:
+    if start-1 >  end:
         print("Error: findPageBounds: start={} > end={}".format(start, end))
-        for i in p: print(i)
+        for i in range(len(p)): print(i, p[i])
         exit(1)
     return (start, end)
 
@@ -41,10 +42,12 @@ def unifyColumns(pages):
                 exit(1)
 
             # find employeeID and name
-            identifications = re.findall(r'[0-9]{10}[ \t]*[A-Z \'\.-]+', l)
+            identifications = re.findall(r'[0-9]{10}', l)
             if len(identifications) != 1: continue
-            employeeID = re.findall('[0-9]{10}', identifications[0])[0]
-            info.extend([employeeID, identifications[0][10:].strip()])
+            employeeID = identifications[0].strip()
+            name = l[l.index(identifications[0])+len(identifications[0]):].strip()
+            if '/' in name: name = name[name.index('/')+1:]
+            info.extend([employeeID, name]) 
 
             info = [piece.strip() for piece in info]
             pages[i][j] = info
@@ -79,26 +82,31 @@ def finalTrim(pages):
 def processCsv(fn):
     lines = getCsvByLines(fn)
     pages = paginate(lines, 'DEPARTMENT INSTRUCTIONAL REPORT-FINAL')
+    if pages == []: pages = paginate(lines, 'SUBJECT:')
     unifyColumns(pages)
     addInfoFromHeader(pages)
     lines = finalTrim(pages)
-    
     for l in lines: 
         if len(l) != 7: print(l)
     return lines
 
+#  def writeExcel(lines, sname):
+#      wb.create_sheet(title=sname)
+#      st = wb[sname]
+#      for r, l in enumerate(lines):
+#          for i in range(len(l)):
+#              st[getLetter(i+1)+str(r+1)] = l[i]
 
 cur_file = None
 dst_folder = './dir/'
 src_folder = './dir/'
-empty_course_name = 'empty'
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python3 dirParser.py <csv file>")
         exit(1)
     
     if sys.argv[1] == '-b' or sys.argv[1] == '--batch':
-        wb = openpyxl.Workbook()
+        #  wb = openpyxl.Workbook()
         for year in range(2014, 2020+1):
             for term in ['spring', 'fall']:
                 if year == 2014 and term == 'spring': continue
@@ -106,11 +114,11 @@ if __name__ == "__main__":
                 
                 cur_file = src_folder + str(year) + term + '.csv'
                 print("Processing", cur_file)
+                processCsv(cur_file)
                 #  writeExcel(processCsv(cur_file), str(year)+term)        # FIXME
                 
-        print('Saving')
-        wb.save(dst_folder + 'grade_dist.xlsx')
-
+        #  print('Saving')
+        #  wb.save(dst_folder + 'dirParsed.xlsx')
     else: 
         cur_file = sys.argv[1]
         processCsv(cur_file)
