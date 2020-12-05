@@ -86,16 +86,16 @@ def processCsv(fn):
     unifyColumns(pages)
     addInfoFromHeader(pages)
     lines = finalTrim(pages)
-    for l in lines: 
-        if len(l) != 7: print(l)
+    #  for l in lines:
+    #      if len(l) != 7: print(l)
     return lines
 
-#  def writeExcel(lines, sname):
-#      wb.create_sheet(title=sname)
-#      st = wb[sname]
-#      for r, l in enumerate(lines):
-#          for i in range(len(l)):
-#              st[getLetter(i+1)+str(r+1)] = l[i]
+def writeExcel(wb, lines, sname):
+    wb.create_sheet(title=sname)
+    st = wb[sname]
+    for r, l in enumerate(lines):
+        for i in range(len(l)):
+            st[getLetter(i+1)+str(r+1)] = l[i]
 
 cur_file = None
 dst_folder = './dir/'
@@ -106,7 +106,7 @@ if __name__ == "__main__":
         exit(1)
     
     if sys.argv[1] == '-b' or sys.argv[1] == '--batch':
-        #  wb = openpyxl.Workbook()
+        wb = openpyxl.Workbook()
         for year in range(2014, 2020+1):
             for term in ['spring', 'fall']:
                 if year == 2014 and term == 'spring': continue
@@ -115,10 +115,9 @@ if __name__ == "__main__":
                 cur_file = src_folder + str(year) + term + '.csv'
                 print("Processing", cur_file)
                 processCsv(cur_file)
-                #  writeExcel(processCsv(cur_file), str(year)+term)        # FIXME
-                
-        #  print('Saving')
-        #  wb.save(dst_folder + 'dirParsed.xlsx')
+                writeExcel(wb, processCsv(cur_file), str(year)+term)
+        print("Saving")
+        wb.save(dst_folder + 'dirParsed.xlsx')
     else: 
         cur_file = sys.argv[1]
         processCsv(cur_file)
