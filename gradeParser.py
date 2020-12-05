@@ -209,7 +209,7 @@ if __name__ == "__main__":
                 writeExcel(processCsv(cur_file), str(year)+term)
                 
         print('Saving')
-        wb.save(dst_folder + 'grade_dist.xlsx')
+        wb.save(dst_folder + 'gradeParsed.xlsx')
 
     else: 
         cur_file = sys.argv[1]
