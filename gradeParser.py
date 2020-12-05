@@ -160,9 +160,6 @@ def finalTrim(pages):
         lines.extend(pages[i][start:end])
     return lines
 
-def getLetter(n):
-    return chr(ord('@')+n)
-
 def writeExcel(lines, sname):
     wb.create_sheet(title=sname)
     st = wb[sname]

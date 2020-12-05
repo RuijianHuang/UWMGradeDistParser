@@ -35,3 +35,6 @@ def paginate(lines, pageHeader):
             pages.append(lines[pageNum[i]:len(lines)-1])
     return pages
         
+def getLetter(n):
+    return chr(ord('@')+n)
+
