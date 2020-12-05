@@ -3,7 +3,7 @@ import re
 
 def removeIrrelevantLines(lines):
     removeIndex = []
-    irrelevantKeys = ['Please note', 'S/SD and U/UD', '***', 'Dept. Total', 'Section Total']
+    irrelevantKeys = ['Please note', 'S/SD and U/UD', 'Dept. Total', 'Section Total']       # ***?
     for i in range(len(lines)):
         for k in irrelevantKeys: 
             if k in lines[i]:
@@ -47,7 +47,7 @@ def findPageBounds(p):
     end = None
     for i in range(len(p)):
         if 'Grades' in p[i] and 'GPA' in p[i]: start = i+1
-        if 'Summary by Level' in p[i]: 
+        if 'Summary by Level' in p[i] or ('Page' in p[i] and 'of' in p[i]): 
             end = i
             break
         if 'Summary by College/School' in p[i]: return (1, 0)       # discard Summary page
@@ -69,7 +69,6 @@ def unifyColumns(pages):
         start, end = findPageBounds(pages[i])           # find grade_dist data in a page
         for j in range(start, end):
             l = pages[i][j].split()
-
             
             replacementIndex = {}   # replace [.]+ with ( null )+, and extend elements to one list of strings
             additionIndex = {}      # replace [.]+ attched to float by inserting
@@ -105,11 +104,13 @@ def unifyColumns(pages):
                 if findings != []: break
                 findings = re.findall(stop_signs[sign_i], l_joined)
             if findings == []:
-                if l_joined == 'Biotech&Phmacogenomics': pages[i][j-1][0] += l_joined   # Special case: 2-line course_name
+                if l_joined == 'Biotech&Phmacogenomics':    # Special case: 2-line course_name
+                    pages[i][j-1][0] += l_joined  
+                    continue
                 else:
                     print("Error: cannot find identify course_name by existing "\
                             "stop_signs in page {} line \n{}".format(i, l_joined))
-                exit(1)
+                    exit(1)
 
             course_name_tail = l_joined.index(findings[0])
             if sign_i > 4: course_name_tail += 1
@@ -117,7 +118,7 @@ def unifyColumns(pages):
 
             l_joined = l_joined[len(course_name):].strip()
             l = l_joined.split()
-            l.insert(0, course_name if course_name is not None else "empty")
+            l.insert(0, course_name if course_name !='' else empty_course_name)
             
             # special cases
             if l[0] == 'Russ Honor Tutorial-Slav' and (l[1]=='101' or l[1]=='102'):
@@ -129,11 +130,37 @@ def unifyColumns(pages):
                 l.insert(4, " null ")
 
             # DEBUG
-            if len(l) != 21: 
+            if len(l) != 21 and "***" not in "".join(l):                # FIXME: get rid of *** lines
                 print("Warning: #col mismatch at:\n", sys.argv[1], len(l), "p", i, l)
 
             pages[i][j] = l
 
+# find course_name by looking downward
+def findCourseName(pages, pageNum, curLine, endLine):
+    for k in range(curLine, endLine):
+        if pages[pageNum][k][1] == 'Course' and pages[pageNum][k][2] == 'Total':
+            return pages[pageNum][k][0]
+    return empty_course_name
+
+# find course_name for those with only course_code/section_code
+def fillEmptyCourseName(pages):
+    for i in range(len(pages)-2):
+        start, end = findPageBounds(pages[i])           # find grade_dist data in a page TODO: optimization can wait
+        startN, endN = findPageBounds(pages[i+1])       # find grade_dist data in a page TODO: optimization can wait
+        for j in range(start, end):                     # find at this page and the next
+            if pages[i][j][0] == empty_course_name:
+                pages[i][j][0] = findCourseName(pages, i, j, end)
+            if pages[i][j][0] == empty_course_name:
+                pages[i][j][0] = findCourseName(pages, i+1, startN, endN)
+            if pages[i][j][0] == empty_course_name:
+                print("Error: fillEmptyCourseName: cannot find course_name for")
+                print(pages[i][j][0], 'in page', i, ":")
+                for i, l in enumerate(pages[i]): print(i, l)
+                print("\n\nand page", i+1, ':')
+                for i, l in enumerate(pages[i+1]): print(i, l)
+                exit(1)
+
+empty_course_name = 'empty'
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python3 ??extractor.py <csv file>")
@@ -142,5 +169,12 @@ if __name__ == "__main__":
     lines = getCsvByLines(sys.argv[1])
     pages = paginate(lines)
     unifyColumns(pages)
+    fillEmptyCourseName(pages)
     
-    
+    # FIXME
+    for p in pages:
+        start, end = findPageBounds(p)           # find grade_dist data in a page TODO: optimization can wait
+        for j in range(start, end):
+            print(p[j])
+
+
